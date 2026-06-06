@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>D2 Diagram Studio — Visual Diagram Editor</title>
+  <meta name="description" content="A free, open-source web app for creating beautiful diagrams using the D2 diagramming language. Features real-time preview, multiple layout engines, and export options." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◇</text></svg>" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header / Toolbar -->
+    <header id="toolbar">
+      <div class="toolbar-left">
+        <div class="logo">
+          <span class="logo-icon">◇</span>
+          <span class="logo-text">D2 Studio</span>
+        </div>
+        <div class="toolbar-divider"></div>
+        <div class="control-group">
+          <label class="control-label">Examples</label>
+          <select id="example-select" class="control-select">
+            <option value="">Load example...</option>
+          </select>
+        </div>
+      </div>
+      <div class="toolbar-center">
+        <div class="control-group">
+          <label class="control-label">Direction</label>
+          <div class="direction-buttons" id="direction-buttons">
+            <button class="dir-btn" data-dir="up" title="Top to Bottom (Up)">↑</button>
+            <button class="dir-btn active" data-dir="down" title="Top to Bottom (Down)">↓</button>
+            <button class="dir-btn" data-dir="left" title="Right to Left">←</button>
+            <button class="dir-btn" data-dir="right" title="Left to Right">→</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <label class="control-label">Layout Engine</label>
+          <select id="layout-engine" class="control-select">
+            <option value="dagre">Dagre</option>
+            <option value="elk">ELK</option>
+            <option value="tala">TALA</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label class="control-label">Sketch</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="sketch-toggle" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="toolbar-right">
+        <div class="control-group">
+          <button id="export-btn" class="action-btn" title="Export Diagram">
+            <span class="btn-icon">⤓</span>
+            <span class="btn-text">Export</span>
+          </button>
+          <div id="export-dropdown" class="dropdown-menu hidden">
+            <button class="dropdown-item" data-export="svg">Download SVG</button>
+            <button class="dropdown-item" data-export="png">Download PNG</button>
+            <button class="dropdown-item" data-export="d2">Download D2 Source</button>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item" data-export="copy-svg">Copy SVG to Clipboard</button>
+          </div>
+        </div>
+        <button id="theme-toggle" class="icon-btn" title="Toggle Dark/Light Theme">
+          <span class="theme-icon-dark">🌙</span>
+          <span class="theme-icon-light">☀️</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="main-content">
+      <!-- Editor Panel -->
+      <div id="editor-panel" class="panel">
+        <div class="panel-header">
+          <span class="panel-title">D2 Code</span>
+          <span class="panel-badge" id="status-badge">Ready</span>
+        </div>
+        <div id="editor-container"></div>
+      </div>
+
+      <!-- Resizer -->
+      <div id="resizer" title="Drag to resize panels">
+        <div class="resizer-line"></div>
+      </div>
+
+      <!-- Preview Panel -->
+      <div id="preview-panel" class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Preview</span>
+          <div class="preview-controls">
+            <button id="zoom-in" class="icon-btn-sm" title="Zoom In">+</button>
+            <button id="zoom-out" class="icon-btn-sm" title="Zoom Out">−</button>
+            <button id="zoom-reset" class="icon-btn-sm" title="Reset Zoom">⊡</button>
+          </div>
+        </div>
+        <div id="preview-container">
+          <div id="diagram-output"></div>
+          <div id="error-overlay" class="hidden">
+            <div class="error-content">
+              <span class="error-icon">⚠</span>
+              <pre id="error-message"></pre>
+            </div>
+          </div>
+          <div id="loading-overlay" class="hidden">
+            <div class="loading-spinner"></div>
+            <span class="loading-text">Rendering...</span>
+          </div>
+          <div id="empty-state">
+            <div class="empty-icon">◇</div>
+            <h3>Write D2 code to see your diagram</h3>
+            <p>Or select an example from the toolbar above</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
