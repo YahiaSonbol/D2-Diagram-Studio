@@ -2,13 +2,15 @@
 
 import './style.css';
 import { createEditor, recreateEditor, setEditorContent, getEditorContent } from './editor.js';
-import { initD2, createDebouncedRenderer } from './d2-engine.js';
+import { initD2, renderD2 } from './d2-engine.js';
+import { renderMermaid } from './mermaid-engine.js';
 import { examples } from './examples.js';
 import { downloadSVG, downloadPNG, downloadD2, copySVGToClipboard } from './export.js';
 import panzoom from 'panzoom';
 
 // ===== State =====
 let editorView = null;
+let currentType = 'd2';
 let currentSVG = '';
 let currentTheme = localStorage.getItem('d2-theme') || 'dark';
 let panzoomInstance = null;
@@ -27,6 +29,8 @@ const errorOverlay = document.getElementById('error-overlay');
 const errorMessage = document.getElementById('error-message');
 const loadingOverlay = document.getElementById('loading-overlay');
 const emptyState = document.getElementById('empty-state');
+const diagramTypeSelect = document.getElementById('diagram-type');
+const panelTitle = document.querySelector('#editor-panel .panel-title');
 const exampleSelect = document.getElementById('example-select');
 const directionButtons = document.getElementById('direction-buttons');
 const layoutEngineSelect = document.getElementById('layout-engine');
@@ -126,7 +130,34 @@ async function init() {
 }
 
 // ===== Debounced Renderer =====
-const debouncedRender = createDebouncedRenderer((result) => {
+function createDebouncedRenderer(delay = 400) {
+  let timeoutId = null;
+  let currentRequestId = 0;
+
+  return function debouncedRender(code, options) {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+
+    const requestId = ++currentRequestId;
+
+    timeoutId = setTimeout(async () => {
+      let result;
+      if (currentType === 'mermaid') {
+        result = await renderMermaid(code, { theme: currentTheme });
+      } else {
+        result = await renderD2(code, options);
+      }
+
+      // Only call back if this is still the latest request
+      if (requestId === currentRequestId) {
+        handleRenderResult(result);
+      }
+    }, delay);
+  };
+}
+
+function handleRenderResult(result) {
   showLoading(false);
 
   if (result.error) {
@@ -147,7 +178,9 @@ const debouncedRender = createDebouncedRenderer((result) => {
     hideError();
     showEmptyState();
   }
-}, 400);
+}
+
+const debouncedRender = createDebouncedRenderer(400);
 
 // ===== Render Trigger =====
 async function triggerRender(code) {
@@ -174,6 +207,35 @@ function onCodeChange(code) {
 
 // ===== Event Listeners =====
 function setupEventListeners() {
+  // Diagram type selector
+  diagramTypeSelect.addEventListener('change', (e) => {
+    currentType = e.target.value;
+    panelTitle.textContent = currentType === 'mermaid' ? 'Mermaid Code' : 'D2 Code';
+    
+    // Toggle layout controls based on type
+    const layoutControls = [directionButtons, layoutEngineSelect, sketchToggle].map(el => el.closest('.control-group'));
+    layoutControls.forEach(ctrl => {
+      if (currentType === 'mermaid') {
+        ctrl.classList.add('hidden-control');
+      } else {
+        ctrl.classList.remove('hidden-control');
+      }
+    });
+
+    // Set sample code for mermaid if switching to it
+    if (currentType === 'mermaid' && getEditorContent(editorView).includes('Welcome to D2')) {
+      const mermaidSample = `graph TD
+    A[Hard] -->|Free| B(Round)
+    B --> C{Decision}
+    C -->|One| D[Result 1]
+    C -->|Two| E[Result 2]`;
+      setEditorContent(editorView, mermaidSample);
+      triggerRender(mermaidSample);
+    } else {
+      triggerRender(getEditorContent(editorView));
+    }
+  });
+
   // Example selector
   exampleSelect.addEventListener('change', (e) => {
     const example = examples.find((ex) => ex.name === e.target.value);
@@ -217,6 +279,11 @@ function setupEventListeners() {
     const code = getEditorContent(editorView);
     editorView.destroy();
     editorView = createEditor(editorContainer, code, onCodeChange, currentTheme);
+    
+    // Also re-render if it's mermaid to update its theme
+    if (currentType === 'mermaid') {
+      triggerRender(code);
+    }
   });
 
   // Export button

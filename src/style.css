@@ -345,6 +345,10 @@ html, body {
 [data-theme="dark"] .theme-icon-light { display: none; }
 [data-theme="light"] .theme-icon-dark { display: none; }
 
+.hidden-control {
+  display: none !important;
+}
+
 /* Dropdown */
 .dropdown-menu {
   position: absolute;
