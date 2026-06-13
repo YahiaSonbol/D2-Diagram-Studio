@@ -213,7 +213,9 @@ function setupEventListeners() {
     panelTitle.textContent = currentType === 'mermaid' ? 'Mermaid Code' : 'D2 Code';
     
     // Toggle layout controls based on type
-    const layoutControls = [directionButtons, layoutEngineSelect, sketchToggle].map(el => el.closest('.control-group'));
+    const layoutControls = [layoutEngineSelect, sketchToggle].map(el => el.closest('.control-group'));
+    const directionControl = directionButtons.closest('.control-group');
+    
     layoutControls.forEach(ctrl => {
       if (currentType === 'mermaid') {
         ctrl.classList.add('hidden-control');
@@ -221,6 +223,9 @@ function setupEventListeners() {
         ctrl.classList.remove('hidden-control');
       }
     });
+    
+    // Direction is supported by both now
+    directionControl.classList.remove('hidden-control');
 
     // Set sample code for mermaid if switching to it
     if (currentType === 'mermaid' && getEditorContent(editorView).includes('Welcome to D2')) {
@@ -312,7 +317,26 @@ function setupEventListeners() {
         break;
       case 'png':
         try {
-          await downloadPNG(currentSVG);
+          if (currentType === 'd2') {
+            setStatus('rendering', 'Generating PNG...');
+            const result = await renderD2(getEditorContent(editorView), { ...layoutOptions, format: 'png' });
+            if (result.error) throw new Error(result.error);
+            
+            // Trigger download of the blob
+            const url = URL.createObjectURL(result.pngBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'diagram.png';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }, 150);
+            setStatus('success', 'PNG Downloaded');
+          } else {
+            await downloadPNG(currentSVG, 'diagram', 2, currentTheme);
+          }
         } catch (err) {
           showError(`PNG export failed: ${err.message}`);
         }

@@ -25,8 +25,9 @@ app.post('/render', async (req, res) => {
   }
 
   const tempId = Math.random().toString(36).substring(7);
+  const { format = 'svg' } = options;
   const inputPath = join(tmpdir(), `d2-input-${tempId}.d2`);
-  const outputPath = join(tmpdir(), `d2-output-${tempId}.svg`);
+  const outputPath = join(tmpdir(), `d2-output-${tempId}.${format}`);
 
   try {
     // Write D2 code to temp file
@@ -34,12 +35,6 @@ app.post('/render', async (req, res) => {
 
     // Build command
     let cmd = `export PATH="${ENV_PATH}" && d2 --layout ${layoutEngine}`;
-    
-    if (direction && direction !== 'down') {
-      // Directions in D2 are up, down, left, right at top level or in config
-      // But we can also set them in the CLI via environment variables or we inject them in the code.
-      // Already handled in frontend config injection usually, but let's be safe.
-    }
     
     if (sketch) {
       cmd += ' --sketch';
@@ -52,14 +47,17 @@ app.post('/render', async (req, res) => {
 
     // Read result
     const { readFile } = await import('fs/promises');
-    let svg = await readFile(outputPath, 'utf8');
-
-    // Strip TALA watermark
-    // The watermark usually looks like: <text ...>UNLICENSED COPY</text>
-    // We'll use a regex to match and remove it.
-    svg = svg.replace(/<text[^>]*>UNLICENSED COPY<\/text>/g, '');
-
-    res.json({ svg });
+    
+    if (format === 'png') {
+      const pngBuffer = await readFile(outputPath);
+      res.setHeader('Content-Type', 'image/png');
+      return res.send(pngBuffer);
+    } else {
+      let svg = await readFile(outputPath, 'utf8');
+      // Strip TALA watermark
+      svg = svg.replace(/<text[^>]*>UNLICENSED COPY<\/text>/g, '');
+      res.json({ svg });
+    }
   } catch (err) {
     console.error('D2 Render Error:', err);
     res.status(500).json({ 

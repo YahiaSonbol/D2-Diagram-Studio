@@ -18,76 +18,95 @@ export function downloadSVG(svgContent, filename = 'd2-diagram') {
  * @param {string} filename - File name without extension
  * @param {number} scale - Resolution scale factor
  */
-export async function downloadPNG(svgContent, filename = 'd2-diagram', scale = 2) {
+export async function downloadPNG(svgContent, filename = 'diagram', scale = 2, theme = 'dark') {
   if (!svgContent) return;
 
-  // Use DOMParser to get dimensions from the SVG string
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(svgContent, 'image/svg+xml');
-  const svgEl = doc.documentElement;
-
-  let width = parseFloat(svgEl.getAttribute('width'));
-  let height = parseFloat(svgEl.getAttribute('height'));
-
-  // Fallback to viewBox if width/height are missing or not numbers
-  if (!width || !height || isNaN(width) || isNaN(height)) {
-    const viewBox = svgEl.getAttribute('viewBox');
-    if (viewBox) {
-      const parts = viewBox.split(/\s+/).map(parseFloat);
-      if (parts.length === 4) {
-        width = parts[2];
-        height = parts[3];
-      }
-    }
-  }
-
-  // Final fallback
-  width = width || 800;
-  height = height || 600;
-
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    
-    // Ensure the SVG has explicit dimensions and correct namespace
-    svgEl.setAttribute('width', width);
-    svgEl.setAttribute('height', height);
-    
-    const serializedSvg = new XMLSerializer().serializeToString(svgEl);
-    const svgBlob = new Blob([serializedSvg], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgContent, 'image/svg+xml');
+      const svgEl = doc.documentElement;
 
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = width * scale;
-      canvas.height = height * scale;
+      if (svgEl.tagName === 'parsererror') {
+        throw new Error('SVG parsing failed');
+      }
 
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Background color
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw image
-      ctx.drawImage(img, 0, 0, width * scale, height * scale);
+      let width = parseFloat(svgEl.getAttribute('width'));
+      let height = parseFloat(svgEl.getAttribute('height'));
 
-      canvas.toBlob((blob) => {
-        URL.revokeObjectURL(url);
-        if (blob) {
-          triggerDownload(blob, `${filename}.png`);
-          resolve();
-        } else {
-          reject(new Error('Failed to convert to PNG'));
+      if (!width || !height || isNaN(width) || isNaN(height)) {
+        const viewBox = svgEl.getAttribute('viewBox');
+        if (viewBox) {
+          const parts = viewBox.split(/\s+/).map(parseFloat);
+          if (parts.length === 4) {
+            width = parts[2];
+            height = parts[3];
+          }
         }
-      }, 'image/png');
-    };
+      }
 
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Failed to load SVG for PNG conversion'));
-    };
+      width = width || 800;
+      height = height || 600;
 
-    img.src = url;
+      // Ensure explicit dimensions and namespace
+      svgEl.setAttribute('width', width);
+      svgEl.setAttribute('height', height);
+      if (!svgEl.getAttribute('xmlns')) {
+        svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      }
+      
+      // Cleanup: Remove potentially tainting external references in Mermaid/D2 SVGs
+      const styleTags = svgEl.querySelectorAll('style');
+      styleTags.forEach(style => {
+        let css = style.textContent;
+        // Remove @import and external font-face URLs
+        css = css.replace(/@import\s+url\([^)]+\);?/gi, '');
+        css = css.replace(/url\(['"]?https?:\/\/[^'"]+['"]?\)/gi, 'none');
+        style.textContent = css;
+      });
+
+      const serializedSvg = new XMLSerializer().serializeToString(svgEl);
+      const img = new Image();
+      
+      // Use Base64 encoding for better compatibility
+      const blob = new Blob([serializedSvg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = theme === 'dark' ? '#0f0f1a' : '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          const link = document.createElement('a');
+          link.download = `${filename}.png`;
+          link.href = dataUrl;
+          link.click();
+          
+          URL.revokeObjectURL(url);
+          resolve();
+        } catch (err) {
+          URL.revokeObjectURL(url);
+          reject(new Error('Canvas export failed: ' + err.message));
+        }
+      };
+
+      img.onerror = (e) => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Failed to load SVG for PNG conversion'));
+      };
+
+      img.src = url;
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
@@ -144,6 +163,10 @@ function triggerDownload(blob, filename) {
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  
+  // Use a slight timeout before cleanup to ensure the browser has started the download
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 150);
 }

@@ -44,8 +44,8 @@ export async function renderD2(code, options = {}) {
     return { svg: '', error: null };
   }
 
-  // If layout engine is TALA, use the backend server
-  if (layoutEngine === 'tala') {
+  // If layout engine is TALA or format is PNG, use the backend server
+  if (layoutEngine === 'tala' || options.format === 'png') {
     try {
       const response = await fetch('http://localhost:3001/render', {
         method: 'POST',
@@ -60,10 +60,15 @@ export async function renderD2(code, options = {}) {
         throw new Error(errorData.error || 'Backend rendering failed');
       }
 
+      if (options.format === 'png') {
+        const blob = await response.blob();
+        return { pngBlob: blob, error: null };
+      }
+
       const data = await response.json();
       return { svg: data.svg, error: null };
     } catch (err) {
-      return { svg: '', error: `TALA Render Error: ${err.message}` };
+      return { svg: '', error: `${options.format === 'png' ? 'PNG' : 'TALA'} Render Error: ${err.message}` };
     }
   }
 
